@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExxonMobil: Interactive Strategy Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: "Calm Harmony" - A palette grounded in warm neutrals (bg-stone-50, bg-stone-100) with complementary blues (bg-sky-600, border-sky-500) and teals (bg-teal-600) for data and interaction, accented by a subtle warm tone (bg-amber-500) for highlights. This creates a professional, calm, and integrated feel. -->
+    <!-- Application Structure Plan: A top-down, thematic dashboard structure was chosen over a direct report-to-page mapping for superior usability. The flow is: 1. High-Level Intro ("The Dual Challenge"), 2. Interactive Market Outlook, 3. Deep-Dive into ExxonMobil's 2030 Strategy (with interactive pillars), 4. Focus on Low-Carbon Solutions, and 5. Critical Discussion Themes. This guides the user from the broad industry context to specific company strategies and future challenges, making complex information digestible. Navigation is handled by a sticky header, allowing users to jump to any thematic section. This non-linear exploration path empowers users to focus on areas of interest immediately. New LLM features are added to enhance content summarization and generate discussion points. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Global Energy Market Forecasts -> Goal: Compare/Change -> Viz: Interactive Bar/Line Charts (Chart.js) -> Interaction: Buttons to toggle between Oil/Gas views -> Justification: Allows direct comparison of price and production forecasts, making trends immediately visible.
+        - Report Info: ExxonMobil's 2030 Strategic Pillars -> Goal: Organize/Inform -> Viz: Interactive Card Layout (HTML/CSS/JS) -> Interaction: Clicking a pillar reveals detailed metrics and text -> Justification: Breaks down a complex strategy into digestible, user-driven chunks, preventing information overload.
+        - Report Info: Low-Carbon Solutions Portfolio -> Goal: Inform/Compare -> Viz: Donut Chart & Dynamic Text (Chart.js/JS) -> Interaction: Hovering over the chart highlights the corresponding description -> Justification: Visually represents investment allocation and connects it directly to strategic descriptions.
+        - Report Info: Public Trust Data -> Goal: Inform -> Viz: Simple Bar Chart (Chart.js) -> Justification: Clearly and quickly communicates the key statistics on public perception and distrust.
+        - New Feature: Section Summarizer -> Goal: Quickly inform the user of key takeaways -> Viz/Presentation Method: Dynamic text display in a modal-like box -> Interaction: Button click on a section header -> Justification: Improves content consumption and navigation speed. Uses Gemini API for summarization.
+        - New Feature: Discussion Point Generator -> Goal: Generate new, relevant content for the user -> Viz/Presentation Method: Text output in a dedicated area -> Interaction: User text input and a button click -> Justification: Provides a valuable tool for users preparing for a group discussion, directly addressing the original user query's context. Uses Gemini API for generation.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. All visuals are rendered via Canvas (Chart.js) or structured with HTML/Tailwind CSS. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chart-container { position: relative; width: 100%; max-width: 800px; margin-left: auto; margin-right: auto; height: 350px; max-height: 450px; }
+        @media (min-width: 768px) { .chart-container { height: 400px; } }
+        .nav-link { transition: color 0.3s, border-bottom-color 0.3s; }
+        .nav-link:hover, .nav-link.active { color: #0284c7; border-bottom-color: #0284c7; }
+        .strategy-card { transition: transform 0.3s, box-shadow 0.3s; }
+        .strategy-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 0.5rem; }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <header class="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-50">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-sky-700">ExxonMobil Strategy Explorer</h1>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#challenge" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 border-b-2 border-transparent">The Dual Challenge</a>
+                        <a href="#outlook" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 border-b-2 border-transparent">Market Outlook</a>
+                        <a href="#strategy" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 border-b-2 border-transparent">2030 Strategy</a>
+                        <a href="#lcs" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 border-b-2 border-transparent">Low-Carbon Solutions</a>
+                        <a href="#themes" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-600 border-b-2 border-transparent">Discussion Themes</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <select id="mobile-nav" class="bg-stone-100 border border-stone-300 rounded-md p-2 text-sm">
+                        <option value="#challenge">The Dual Challenge</option>
+                        <option value="#outlook">Market Outlook</option>
+                        <option value="#strategy">2030 Strategy</option>
+                        <option value="#lcs">Low-Carbon Solutions</option>
+                        <option value="#themes">Discussion Themes</option>
+                    </select>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <section id="challenge" class="my-12 scroll-mt-20">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">The "And" Equation: A Dual Challenge</h2>
+                <button onclick="summarizeSection('challenge')" class="bg-sky-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">✨ Summarize Section</button>
+            </div>
+            <p class="mt-4 text-lg leading-8 text-stone-600 max-w-3xl mx-auto text-center">ExxonMobil's strategy is built around addressing a fundamental global dilemma: providing reliable, affordable energy to a growing population while simultaneously reducing environmental impacts and mitigating climate change risks. This section explores the core of that challenge.</p>
+            <div class="grid md:grid-cols-2 gap-8 items-center mt-8">
+                <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                    <h3 class="text-xl font-semibold text-sky-700">Growing Demand</h3>
+                    <p class="mt-2 text-stone-600">The world's population is projected to grow from 7.5 billion to 9.2 billion by 2040, driving energy demand 15% higher by 2050. Meeting this need is essential for economic development and improved living standards globally.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                    <h3 class="text-xl font-semibold text-teal-700">Reducing Emissions</h3>
+                    <p class="mt-2 text-stone-600">Concurrently, there is an urgent need to decarbonize the global energy system to address climate change. This involves significant reductions in greenhouse gas emissions across all sectors of the economy.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="outlook" class="my-16 scroll-mt-20">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">Interactive Global Energy Market Outlook</h2>
+                <button onclick="summarizeSection('outlook')" class="bg-sky-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">✨ Summarize Section</button>
+            </div>
+            <p class="mt-4 text-lg leading-8 text-stone-600 max-w-3xl mx-auto text-center">Explore key forecasts for the oil and natural gas markets. Use the buttons below to switch between different commodity outlooks and see how geopolitical events and market fundamentals are shaping prices and production.</p>
+            <div class="mt-6 flex justify-center space-x-4">
+                <button id="btn-oil" class="bg-sky-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">Crude Oil Forecast</button>
+                <button id="btn-gas" class="bg-teal-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500">Natural Gas Forecast</button>
+            </div>
+            <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg border border-stone-200 mt-8">
+                <div class="chart-container">
+                    <canvas id="marketChart"></canvas>
+                </div>
+                <div id="chart-description" class="mt-4 text-center text-stone-600"></div>
+            </div>
+        </section>
+
+        <section id="strategy" class="my-16 scroll-mt-20">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">ExxonMobil's 2030 Strategic Pillars</h2>
+                <button onclick="summarizeSection('strategy')" class="bg-sky-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">✨ Summarize Section</button>
+            </div>
+            <p class="mt-4 text-lg leading-8 text-stone-600 max-w-3xl mx-auto text-center">The company's plan for growth and transformation rests on three core pillars. Click on each pillar to explore the key initiatives, targets, and investments that define ExxonMobil's path to 2030.</p>
+            <div class="grid md:grid-cols-3 gap-8 mt-8">
+                <div class="strategy-card bg-white p-6 rounded-lg shadow-md border border-stone-200 cursor-pointer" data-pillar="assets">
+                    <h3 class="text-xl font-semibold text-sky-700">Advantaged Assets</h3>
+                    <p class="mt-2 text-stone-600">Focusing on high-return, low-cost projects to maximize cash flow from the core hydrocarbon business.</p>
+                </div>
+                <div class="strategy-card bg-white p-6 rounded-lg shadow-md border border-stone-200 cursor-pointer" data-pillar="ops">
+                    <h3 class="text-xl font-semibold text-teal-700">Operational Excellence</h3>
+                    <p class="mt-2 text-stone-600">Driving structural cost savings and efficiency through optimization and modernization.</p>
+                </div>
+                <div class="strategy-card bg-white p-6 rounded-lg shadow-md border border-stone-200 cursor-pointer" data-pillar="lcs">
+                    <h3 class="text-xl font-semibold text-amber-600">Low-Carbon Innovation</h3>
+                    <p class="mt-2 text-stone-600">Investing in new technologies to decarbonize heavy industry and create new revenue streams.</p>
+                </div>
+            </div>
+            <div id="strategy-details" class="mt-8 bg-stone-100 p-6 rounded-lg shadow-inner min-h-[200px]">
+                <p class="text-stone-700 text-center">Select a pillar above to see the details.</p>
+            </div>
+        </section>
+
+        <section id="lcs" class="my-16 scroll-mt-20">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">Low-Carbon Solutions Portfolio</h2>
+                <button onclick="summarizeSection('lcs')" class="bg-sky-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">✨ Summarize Section</button>
+            </div>
+            <p class="mt-4 text-lg leading-8 text-stone-600 max-w-3xl mx-auto text-center">ExxonMobil is investing up to $30 billion by 2030 in a portfolio of lower-emission solutions. This initiative focuses on industrial decarbonization, leveraging core competencies in engineering and project management. Hover over the chart to learn more about each area.</p>
+            <div class="grid lg:grid-cols-2 gap-8 items-center mt-8">
+                <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg border border-stone-200">
+                    <div class="chart-container" style="max-width: 400px; height: 350px;">
+                         <canvas id="lcsChart"></canvas>
+                    </div>
+                </div>
+                <div id="lcs-description" class="bg-white p-6 rounded-lg shadow-md border border-stone-200 min-h-[300px]">
+                    <h3 id="lcs-title" class="text-xl font-semibold text-stone-800">Explore the Portfolio</h3>
+                    <p id="lcs-text" class="mt-2 text-stone-600">Hover over a segment of the chart to see details about ExxonMobil's key low-carbon initiatives.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="themes" class="my-16 scroll-mt-20">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">Critical Discussion Themes</h2>
+                <button onclick="summarizeSection('themes')" class="bg-sky-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">✨ Summarize Section</button>
+            </div>
+            <p class="mt-4 text-lg leading-8 text-stone-600 max-w-3xl mx-auto text-center">The energy transition presents complex challenges beyond technology and finance. This section highlights key areas of stakeholder engagement, ethical considerations, and organizational development that are crucial for success.</p>
+            <div class="space-y-8 mt-8">
+                <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                    <h3 class="text-xl font-semibold text-stone-800">Building Public Trust</h3>
+                    <p class="mt-2 text-stone-600">A significant trust deficit exists, with 66% of the public distrusting fossil fuel companies. This impacts social license to operate, talent acquisition, and regulatory environments. Overcoming this requires enhanced transparency, proactive communication, and genuine community engagement.</p>
+                    <div class="chart-container mt-4" style="height: 250px; max-width: 600px;">
+                        <canvas id="trustChart"></canvas>
+                    </div>
+                </div>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                        <h3 class="text-xl font-semibold text-stone-800">Ethical Dilemmas & CSR</h3>
+                        <p class="mt-2 text-stone-600">There is a fundamental tension between generating profit from fossil fuels and the moral obligation to protect the climate. Navigating this requires robust ethical frameworks, consistent global CSR standards, and transparent reporting to manage social and environmental impacts responsibly.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                        <h3 class="text-xl font-semibold text-stone-800">Talent & Organization</h3>
+                        <p class="mt-2 text-stone-600">The energy transition demands a hybrid talent profile, blending traditional hydrocarbon expertise with skills in digital tech and renewables. Attracting and developing this talent requires a purpose-driven culture that addresses both career aspirations and the desire to solve global climate challenges.</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                    <h3 class="text-xl font-semibold text-stone-800">✨ Discussion Point Generator</h3>
+                    <p class="mt-2 text-stone-600">Enter a topic below and get a list of questions and talking points generated by Gemini.</p>
+                    <div class="mt-4 flex flex-col md:flex-row gap-4">
+                        <input id="discussion-topic-input" type="text" placeholder="e.g., The future of hydrogen" class="flex-grow p-2 border rounded-md focus:ring-sky-500 focus:border-sky-500">
+                        <button id="generate-discussion-btn" class="bg-sky-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">Generate Points</button>
+                    </div>
+                    <div id="discussion-points-output" class="mt-4 p-4 bg-stone-100 rounded-md border border-stone-300 min-h-[100px] flex items-center justify-center text-stone-500">
+                        <p>Discussion points will appear here.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <div id="summary-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <div id="summary-content">
+                    <!-- Summary content goes here -->
+                    <p id="summary-text" class="text-stone-700"></p>
+                    <div id="loading-spinner" class="hidden text-center">
+                        <div class="animate-spin inline-block w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full"></div>
+                        <p class="mt-2 text-stone-500">Generating summary...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-stone-800 text-white mt-16">
+        <div class="container mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm">
+            <p>Interactive dashboard created to explore the strategic themes from the ExxonMobil report.</p>
+            <p class="text-stone-400 mt-1">This is a conceptual tool for analysis and does not represent an official publication by ExxonMobil.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const marketChartCtx = document.getElementById('marketChart').getContext('2d');
+            const lcsChartCtx = document.getElementById('lcsChart').getContext('2d');
+            const trustChartCtx = document.getElementById('trustChart').getContext('2d');
+            let marketChart;
+            
+            const commonChartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#44403c'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#44403c' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        ticks: { 
+                            color: '#44403c',
+                            callback: function(value) {
+                                return '$' + value;
+                            }
+                        },
+                        grid: { color: '#e7e5e4' }
+                    }
+                }
+            };
+
+            const oilData = {
+                labels: ['2025', '2026'],
+                datasets: [{
+                    label: 'Brent Crude Oil Spot Price ($/b)',
+                    data: [69, 58],
+                    backgroundColor: 'rgba(2, 132, 199, 0.6)',
+                    borderColor: 'rgba(2, 132, 199, 1)',
+                    borderWidth: 2,
+                    type: 'bar',
+                    yAxisID: 'y'
+                }, {
+                    label: 'U.S. Crude Oil Production (MMb/d)',
+                    data: [13.4, 13.4],
+                    backgroundColor: 'rgba(13, 148, 136, 0.2)',
+                    borderColor: 'rgba(13, 148, 136, 1)',
+                    borderWidth: 2,
+                    type: 'line',
+                    tension: 0.1,
+                    yAxisID: 'y1',
+                    fill: true
+                }]
+            };
+
+            const gasData = {
+                labels: ['2025', '2026'],
+                datasets: [{
+                    label: 'Henry Hub Spot Price ($/MMBtu)',
+                    data: [3.70, 4.40],
+                    backgroundColor: 'rgba(13, 148, 136, 0.6)',
+                    borderColor: 'rgba(13, 148, 136, 1)',
+                    borderWidth: 2,
+                    type: 'bar',
+                    yAxisID: 'y'
+                }, {
+                    label: 'U.S. LNG Gross Exports (Bcf/d)',
+                    data: [15, 16],
+                    backgroundColor: 'rgba(2, 132, 199, 0.2)',
+                    borderColor: 'rgba(2, 132, 199, 1)',
+                    borderWidth: 2,
+                    type: 'line',
+                    tension: 0.1,
+                    yAxisID: 'y1',
+                    fill: true
+                }]
+            };
+            
+            function createMarketChart(data, description, scales) {
+                if (marketChart) {
+                    marketChart.destroy();
+                }
+                document.getElementById('chart-description').textContent = description;
+                marketChart = new Chart(marketChartCtx, {
+                    type: 'bar',
+                    data: data,
+                    options: {
+                        ...commonChartOptions,
+                        scales: scales
+                    }
+                });
+            }
+
+            const oilScales = {
+                y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Price ($/b)', color: '#0284c7' } },
+                y1: { beginAtZero: false, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Production (MMb/d)', color: '#0d9488' } }
+            };
+            const gasScales = {
+                y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Price ($/MMBtu)', color: '#0d9488' } },
+                y1: { beginAtZero: false, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Exports (Bcf/d)', color: '#0284c7' } }
+            };
+
+            document.getElementById('btn-oil').addEventListener('click', () => createMarketChart(oilData, 'Brent crude prices are forecast to decline due to inventory builds, while U.S. production remains high and stable.', oilScales));
+            document.getElementById('btn-gas').addEventListener('click', () => createMarketChart(gasData, 'Henry Hub prices are expected to rise due to flat production and growing LNG exports.', gasScales));
+            
+            document.getElementById('btn-oil').click();
+
+            const strategyDetails = {
+                assets: {
+                    title: 'Advantaged Asset Expansion',
+                    content: `
+                        <ul class="list-disc list-inside text-stone-600 space-y-2">
+                            <li><strong>Total Upstream Target (2030):</strong> 5.4 MMboe/d</li>
+                            <li><strong>Permian Production Target (2030):</strong> Double to 2.3 MMb/d</li>
+                            <li><strong>Guyana Production Target (2030):</strong> 1.3 MMb/d</li>
+                            <li><strong>Total Investment (2030):</strong> $140 billion in major projects</li>
+                            <li><strong>Targeted Returns:</strong> >30% IRR on new projects</li>
+                        </ul>
+                        <p class="mt-4 text-sm text-stone-500">This pillar focuses on low-cost, high-return oil and gas projects in politically stable regions to generate robust cash flow, funding both shareholder returns and low-carbon investments.</p>
+                    `
+                },
+                ops: {
+                    title: 'Operational Excellence & Cost Savings',
+                    content: `
+                        <ul class="list-disc list-inside text-stone-600 space-y-2">
+                            <li><strong>Structural Cost Savings Target (by 2030):</strong> $7 billion</li>
+                            <li><strong>Cumulative Savings (2019-2030):</strong> $18 billion target</li>
+                            <li><strong>Current Progress:</strong> $13.5 billion in savings achieved since 2019</li>
+                            <li><strong>Methods:</strong> Supply chain optimization, IT modernization, operational simplification.</li>
+                        </ul>
+                        <p class="mt-4 text-sm text-stone-500">This represents a fundamental transformation of the operational model to permanently lower the cost base, ensuring resilience against price volatility and freeing up capital for strategic growth.</p>
+                    `
+                },
+                lcs: {
+                    title: 'Low-Carbon Innovation',
+                    content: `
+                        <ul class="list-disc list-inside text-stone-600 space-y-2">
+                            <li><strong>Total Low-Carbon Investment (2025-2030):</strong> Up to $30 billion</li>
+                            <li><strong>Key Areas:</strong> Carbon Capture (CCS), Hydrogen, Battery Materials, Renewable Diesel.</li>
+                            <li><strong>CCS Leadership:</strong> >1,500 miles of CO2 pipeline; potential to reduce >100M metric tons/year.</li>
+                            <li><strong>Earnings Goal:</strong> $2 billion in additional earnings by 2030 from renewable diesel & advanced recycling.</li>
+                        </ul>
+                        <p class="mt-4 text-sm text-stone-500">This pillar leverages core engineering strengths to decarbonize heavy industry and create new, profitable business lines, positioning the company as a leader in industrial decarbonization.</p>
+                    `
+                }
+            };
+
+            document.querySelectorAll('.strategy-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const pillar = card.dataset.pillar;
+                    const details = strategyDetails[pillar];
+                    const detailsContainer = document.getElementById('strategy-details');
+                    detailsContainer.innerHTML = `
+                        <h4 class="text-2xl font-bold text-stone-800 mb-4">${details.title}</h4>
+                        ${details.content}
+                    `;
+                });
+            });
+            
+            const lcsData = {
+                labels: ['Carbon Capture & Storage', 'Hydrogen', 'Biofuels & Recycling', 'Battery Materials'],
+                datasets: [{
+                    label: 'Low-Carbon Investment Focus',
+                    data: [40, 25, 20, 15],
+                    backgroundColor: ['#0284c7', '#0d9488', '#f59e0b', '#64748b'],
+                    hoverOffset: 4
+                }]
+            };
+
+            const lcsDescriptions = {
+                'Carbon Capture & Storage': {
+                    title: 'Carbon Capture & Storage (CCS)',
+                    text: 'A global leader in CCS, enhanced by the Denbury acquisition. ExxonMobil is building the world\'s largest CCS system with over 1,500 miles of CO2 pipeline, targeting hard-to-abate industrial emissions.'
+                },
+                'Hydrogen': {
+                    title: 'Hydrogen Production',
+                    text: 'Developing large-scale hydrogen facilities, like the one in Baytown, to provide low-carbon fuel for transportation and heavy industry, leveraging existing infrastructure and expertise.'
+                },
+                'Biofuels & Recycling': {
+                    title: 'Biofuels & Advanced Recycling',
+                    text: 'Investing in renewable diesel, like the Strathcona facility, and advanced plastics recycling. These initiatives are projected to add $2 billion in earnings by 2030.'
+                },
+                'Battery Materials': {
+                    title: 'Battery Materials',
+                    text: 'Entering the battery anode market with advanced graphite materials to support the growing electrification of transport and industry, diversifying the portfolio into new energy value chains.'
+                }
+            };
+
+            new Chart(lcsChartCtx, {
+                type: 'doughnut',
+                data: lcsData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: true },
+                        hover: {
+                            onHover: function(event, chartElement) {
+                                const lcsTitle = document.getElementById('lcs-title');
+                                const lcsText = document.getElementById('lcs-text');
+                                if (chartElement.length) {
+                                    const index = chartElement[0].index;
+                                    const label = lcsData.labels[index];
+                                    const details = lcsDescriptions[label];
+                                    lcsTitle.textContent = details.title;
+                                    lcsText.textContent = details.text;
+                                }
+                            }
+                        }
+                    },
+                    onHover: (event, chartElement) => {
+                        const lcsTitle = document.getElementById('lcs-title');
+                        const lcsText = document.getElementById('lcs-text');
+                        if (chartElement.length) {
+                            const index = chartElement[0].index;
+                            const label = lcsData.labels[index];
+                            const details = lcsDescriptions[label];
+                            lcsTitle.textContent = details.title;
+                            lcsText.textContent = details.text;
+                        } else {
+                            lcsTitle.textContent = 'Explore the Portfolio';
+                            lcsText.textContent = 'Hover over a segment of the chart to see details about ExxonMobil\'s key low-carbon initiatives.';
+                        }
+                    }
+                }
+            });
+
+            new Chart(trustChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Distrust Fossil Fuel Companies', 'Support Phasing Out Fossil Fuels', 'Expect Higher Prices from Transition'],
+                    datasets: [{
+                        label: 'Public Opinion (%)',
+                        data: [66, 31, 44],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#6b7280'],
+                        borderColor: ['#dc2626', '#d97706', '#4b5563'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                             callbacks: {
+                                label: function(context) { return `${context.dataset.label}: ${context.raw}%`; }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { max: 100, ticks: { callback: value => value + '%' } },
+                        y: { ticks: {
+                            autoSkip: false,
+                            callback: function(value) {
+                                const label = this.getLabelForValue(value);
+                                return label.length > 25 ? label.substring(0, 25) + '...' : label;
+                            }
+                        }}
+                    }
+                }
+            });
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('main section');
+            const mobileNav = document.getElementById('mobile-nav');
+            const summaryModal = document.getElementById('summary-modal');
+            const closeModalBtn = document.querySelector('.close-button');
+            const summaryText = document.getElementById('summary-text');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const generateDiscussionBtn = document.getElementById('generate-discussion-btn');
+            const discussionTopicInput = document.getElementById('discussion-topic-input');
+            const discussionPointsOutput = document.getElementById('discussion-points-output');
+
+            mobileNav.addEventListener('change', (e) => {
+                const targetId = e.target.value;
+                document.querySelector(targetId).scrollIntoView({ behavior: 'smooth' });
+            });
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 80) {
+                        current = '#' + section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active', 'text-sky-600', 'border-sky-600');
+                    link.classList.add('text-stone-600', 'border-transparent');
+                    if (link.getAttribute('href') === current) {
+                        link.classList.add('active', 'text-sky-600', 'border-sky-600');
+                        link.classList.remove('text-stone-600', 'border-transparent');
+                    }
+                });
+                if(mobileNav.value !== current) {
+                    mobileNav.value = current;
+                }
+            });
+            
+            const sectionContent = {
+                challenge: "ExxonMobil's strategy is built around addressing a fundamental global dilemma: providing reliable, affordable energy to a growing population while simultaneously reducing environmental impacts and mitigating climate change risks. The world's population is projected to grow from 7.5 billion to 9.2 billion by 2040, driving energy demand 15% higher by 2050. Concurrently, there is an urgent need to decarbonize the global energy system to address climate change. This involves significant reductions in greenhouse gas emissions across all sectors of the economy.",
+                outlook: "This section explores key forecasts for the oil and natural gas markets. Crude oil prices are forecast to decline, while U.S. production remains high. Henry Hub natural gas prices are expected to rise due to flat production and growing LNG exports. These trends are driven by geopolitical events and market fundamentals.",
+                strategy: "The company's plan for growth and transformation rests on three core pillars. Advantaged Assets focuses on high-return, low-cost projects in politically stable regions. Operational Excellence aims for structural cost savings and efficiency through modernization. Low-Carbon Innovation invests in new technologies to decarbonize heavy industry and create new revenue streams.",
+                lcs: "ExxonMobil is investing up to $30 billion by 2030 in a portfolio of lower-emission solutions. This initiative focuses on industrial decarbonization. Key areas include Carbon Capture & Storage (CCS), Hydrogen, Biofuels & Advanced Recycling, and Battery Materials. The goal is to leverage core competencies in engineering and project management.",
+                themes: "The energy transition presents complex challenges beyond technology and finance. This section highlights key areas of stakeholder engagement, ethical considerations, and organizational development. There is a significant trust deficit with 66% of the public distrusting fossil fuel companies. Ethical dilemmas exist between profit and climate protection. The company needs to attract new talent with a hybrid skill set for the transition."
+            };
+
+            const API_KEY = "";
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+
+            async function fetchWithExponentialBackoff(fetchCall) {
+                let delay = 1000;
+                const maxRetries = 5;
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        const response = await fetchCall();
+                        if (response.ok) {
+                            return response;
+                        }
+                    } catch (error) {
+                        // Do not log this error as per instructions.
+                    }
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+                throw new Error("API call failed after multiple retries.");
+            }
+
+            async function generateContent(prompt) {
+                try {
+                    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                    const response = await fetchWithExponentialBackoff(() => fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }));
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                    } else {
+                        return 'Sorry, I couldn\'t generate a response. Please try again.';
+                    }
+                } catch (error) {
+                    return 'An error occurred. Please check your network and try again.';
+                }
+            }
+
+            window.summarizeSection = async (sectionId) => {
+                summaryModal.style.display = "block";
+                summaryText.innerHTML = '';
+                loadingSpinner.classList.remove('hidden');
+
+                const contentToSummarize = sectionContent[sectionId] || "Content not found.";
+                const prompt = `Summarize the following text in a concise, bulleted list. The summary should be suitable for a professional audience and be based ONLY on the provided text.\n\nText: ${contentToSummarize}`;
+
+                const summary = await generateContent(prompt);
+                
+                loadingSpinner.classList.add('hidden');
+                const formattedSummary = summary.split('\n').map(line => `<p>${line}</p>`).join('');
+                summaryText.innerHTML = formattedSummary;
+            };
+
+            generateDiscussionBtn.addEventListener('click', async () => {
+                const topic = discussionTopicInput.value.trim();
+                if (!topic) {
+                    discussionPointsOutput.innerHTML = '<p class="text-red-500">Please enter a topic to generate discussion points.</p>';
+                    return;
+                }
+
+                discussionPointsOutput.innerHTML = `<div id="loading-spinner" class="text-center">
+                    <div class="animate-spin inline-block w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full"></div>
+                    <p class="mt-2 text-stone-500">Generating discussion points for "${topic}"...</p>
+                </div>`;
+
+                const prompt = `Act as a moderator for a group discussion. Generate 5 thought-provoking discussion questions or points for a professional audience about the following topic: "${topic}". Format the response as a numbered list.`;
+                const points = await generateContent(prompt);
+                
+                discussionPointsOutput.innerHTML = `<p class="font-semibold mb-2">Discussion Points on "${topic}":</p>${points}`;
+            });
+
+            closeModalBtn.addEventListener('click', () => {
+                summaryModal.style.display = "none";
+            });
+
+            window.addEventListener('click', (event) => {
+                if (event.target == summaryModal) {
+                    summaryModal.style.display = "none";
+                }
+            });
+        });
+    </script>
+</body>
+</html>
